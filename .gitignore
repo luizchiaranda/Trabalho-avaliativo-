@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+*.tsbuildinfo
+
+# secrets - NUNCA versionar
+.env
+.env.*
+!.env.example
+
+# prisma client gerado (recriado por `npx prisma generate`)
+/src/generated/
+
+# uploads (arquivos enviados em runtime)
+uploads/*
+!uploads/.gitkeep
+uploads-test/
+
+# logs e coverage
+*.log
+coverage/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

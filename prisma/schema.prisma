@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  DRIVER
+  OPERATOR
+  ADMIN
+}
+
+enum LicenseCategory {
+  A
+  B
+  C
+  D
+  E
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  CAR
+  VAN
+  TRUCK
+}
+
+// "Em uso" não é um status: é derivado de existir uma Delivery ativa.
+// Guardar IN_USE aqui criaria uma segunda fonte da verdade que poderia divergir.
+enum VehicleStatus {
+  AVAILABLE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum OrderStatus {
+  PENDING
+  SCHEDULED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED // exige comprovante
+  FAILED // exige ocorrência; o pedido volta para PENDING
+  CANCELLED // o pedido volta para PENDING
+}
+
+enum OccurrenceType {
+  RECIPIENT_ABSENT
+  WRONG_ADDRESS
+  DAMAGED_GOODS
+  VEHICLE_BREAKDOWN
+  OTHER
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(160)
+  passwordHash String // nunca devolver em respostas da API
+  role         Role     @default(CUSTOMER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer Customer?
+  driver   Driver?
+
+  assignedDeliveries Delivery[]              @relation("DeliveryAssignedBy")
+  statusChanges      DeliveryStatusHistory[]
+  occurrences        Occurrence[]
+
+  @@map("users")
+}
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid // o @unique garante a relação 1-1
+  document  String   @unique @db.VarChar(14)
+  phone     String   @db.VarChar(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  orders DeliveryOrder[]
+
+  @@map("customers")
+}
+
+model Driver {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @unique @db.Uuid
+  licenseNumber    String          @unique @db.VarChar(20)
+  licenseCategory  LicenseCategory
+  licenseExpiresAt DateTime        @db.Date
+  phone            String          @db.VarChar(20)
+  active           Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  deliveries Delivery[]
+
+  @@map("drivers")
+}
+
+model Vehicle {
+  id         String        @id @default(uuid()) @db.Uuid
+  plate      String        @unique @db.VarChar(8)
+  model      String        @db.VarChar(80)
+  type       VehicleType
+  capacityKg Float
+  status     VehicleStatus @default(AVAILABLE)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  deliveries Delivery[]
+
+  @@map("vehicles")
+}
+
+// A demanda do cliente: o que levar e de onde para onde.
+model DeliveryOrder {
+  id          String @id @default(uuid()) @db.Uuid
+  customerId  String @db.Uuid
+  description String @db.VarChar(255)
+  weightKg    Float
+
+  originCep          String  @db.VarChar(8)
+  originStreet       String  @db.VarChar(160)
+  originNumber       String  @db.VarChar(20)
+  originComplement   String? @db.VarChar(80)
+  originNeighborhood String  @db.VarChar(100)
+  originCity         String  @db.VarChar(100)
+  originState        String  @db.VarChar(2)
+
+  destinationCep          String  @db.VarChar(8)
+  destinationStreet       String  @db.VarChar(160)
+  destinationNumber       String  @db.VarChar(20)
+  destinationComplement   String? @db.VarChar(80)
+  destinationNeighborhood String  @db.VarChar(100)
+  destinationCity         String  @db.VarChar(100)
+  destinationState        String  @db.VarChar(2)
+
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  deliveries Delivery[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("delivery_orders")
+}
+
+// A execução: um motorista, com um veículo, tentando cumprir um pedido.
+// Um pedido pode ter várias entregas (tentativas), mas só uma ativa por vez.
+model Delivery {
+  id           String         @id @default(uuid()) @db.Uuid
+  orderId      String         @db.Uuid
+  driverId     String         @db.Uuid
+  vehicleId    String         @db.Uuid
+  assignedById String         @db.Uuid
+  status       DeliveryStatus @default(ASSIGNED)
+  finishedAt   DateTime?
+
+  proofPath         String?   @db.VarChar(255) // nome do arquivo em disco, nunca uma URL pública
+  proofOriginalName String?   @db.VarChar(255)
+  proofMimeType     String?   @db.VarChar(100)
+  proofSize         Int?
+  proofUploadedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order       DeliveryOrder           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  driver      Driver                  @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicle     Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  assignedBy  User                    @relation("DeliveryAssignedBy", fields: [assignedById], references: [id], onDelete: Restrict)
+  history     DeliveryStatusHistory[]
+  occurrences Occurrence[]
+
+  @@index([orderId])
+  @@index([driverId, status])
+  @@index([vehicleId, status])
+  @@map("deliveries")
+}
+
+// Histórico append-only: só recebe INSERT.
+model DeliveryStatusHistory {
+  id          String          @id @default(uuid()) @db.Uuid
+  deliveryId  String          @db.Uuid
+  fromStatus  DeliveryStatus? // null na criação da entrega
+  toStatus    DeliveryStatus
+  changedById String          @db.Uuid
+  note        String?         @db.VarChar(255)
+  createdAt   DateTime        @default(now())
+
+  delivery  Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  changedBy User     @relation(fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@index([deliveryId, createdAt])
+  @@map("delivery_status_history")
+}
+
+model Occurrence {
+  id           String         @id @default(uuid()) @db.Uuid
+  deliveryId   String         @db.Uuid
+  reportedById String         @db.Uuid
+  type         OccurrenceType
+  description  String         @db.VarChar(500)
+  createdAt    DateTime       @default(now())
+
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  reportedBy User     @relation(fields: [reportedById], references: [id], onDelete: Restrict)
+
+  @@index([deliveryId])
+  @@map("occurrences")
+}
