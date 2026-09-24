@@ -14,7 +14,7 @@ Foi entregue uma API REST completa para logística e entregas, com **41 endpoint
 | `npm run build` | ✅ sem erros (também em clone limpo, sem `.env` e sem client gerado) |
 | Lint (oxlint, com tipos) | ✅ 0 avisos, 0 erros |
 | Testes unitários | ✅ **85 / 85** |
-| Testes de integração (banco real) | ✅ **163 / 163** |
+| Testes de integração (banco real) | ✅ **168 / 168** |
 | Schema Prisma × banco | ✅ sem divergência (`migrate diff` vazio) |
 | Verificação manual com a API real do ViaCEP | ✅ |
 | Código de aplicação | 67 arquivos, ~2.750 linhas |
@@ -83,7 +83,7 @@ Foi entregue uma API REST completa para logística e entregas, com **41 endpoint
 | Paginação, filtros e ordenação | ✅ |
 | Seed | ✅ |
 | Testes automatizados | ✅ |
-| Swagger | ❌ não implementado |
+| Swagger | ✅ implementado (adendo 24/09/2026, seção 11) |
 | Docker | ❌ não implementado |
 | Indicadores do domínio | ❌ não implementado |
 
@@ -104,7 +104,7 @@ Foi entregue uma API REST completa para logística e entregas, com **41 endpoint
 
 ## 4. Testes
 
-### 4.1 Testes de integração (163) — banco PostgreSQL real, banco de teste separado
+### 4.1 Testes de integração (168) — banco PostgreSQL real, banco de teste separado
 
 | Arquivo | Testes | Foco |
 |---|:-:|---|
@@ -116,8 +116,9 @@ Foi entregue uma API REST completa para logística e entregas, com **41 endpoint
 | `upload.e2e-spec.ts` | 15 | Upload válido e inválido, path traversal, download |
 | `cep-integration.e2e-spec.ts` | 10 | Integração funcionando e falhando de forma controlada |
 | `security.e2e-spec.ts` | 11 | Helmet, Compression, Interceptor, dados sensíveis, formato de erro |
+| `swagger.e2e-spec.ts` | 5 | `/docs` e `/docs-json` acessíveis sem X-API-KEY; segurança padrão (ApiKey+JWT) vs. rotas públicas (só ApiKey); os 41 endpoints documentados |
 
-### 4.2 Testes unitários (84)
+### 4.2 Testes unitários (85)
 
 | Arquivo | Testes | Foco |
 |---|:-:|---|
@@ -185,9 +186,10 @@ Registrados aqui por transparência e porque cada um ensina algo.
 - Sem *rate limiting* (proteção contra força bruta no login).
 - CPF/CNPJ validados por tamanho, sem dígitos verificadores.
 - O provedor real de CEP só foi exercitado manualmente; a suíte automatizada usa um mock local para ser determinística.
-- Swagger, Docker e indicadores do domínio (bônus) não foram implementados.
+- Docker e indicadores do domínio (bônus) não foram implementados.
+- A página do Swagger (`/docs`) fica acessível sem `X-API-KEY` (limitação de como `SwaggerModule.setup()` registra suas rotas — ver seção 11 abaixo); é decisão consciente, não descuido, mas vale mencionar numa entrega real.
 
-**Próximos passos naturais:** rate limiting no login, refresh token, armazenamento de objetos, Swagger, `docker-compose` com PostgreSQL, indicadores (entregas por status, tempo médio por rota, taxa de falha por motorista).
+**Próximos passos naturais:** rate limiting no login, refresh token, armazenamento de objetos, `docker-compose` com PostgreSQL, indicadores (entregas por status, tempo médio por rota, taxa de falha por motorista).
 
 ---
 
@@ -200,8 +202,9 @@ npx prisma migrate deploy
 npm run seed
 npm run build
 npm test                      # 85 unitários
-npm run test:e2e              # 163 de integração (cria o banco <nome>_test sozinho)
+npm run test:e2e              # 168 de integração (cria o banco <nome>_test sozinho)
 npm run start:prod
+# documentação interativa em http://localhost:3000/docs
 ```
 
 Detalhes completos no `README.md`.
@@ -245,3 +248,23 @@ Os bugs 1–3 são do mesmo tipo: a regra "motorista/veículo não podem ter atr
 **Uma suspeita investigada e descartada:** ao revisar `delivery.rules.ts`, pareceu que `DeliveryStatus.ASSIGNED` sobrando em `DRIVER_TARGET_STATUSES` era código morto (nenhuma transição do mapa leva a esse estado). Ao remover, um teste existente quebrou: o motorista que pede `status: "ASSIGNED"` precisa continuar recebendo `409` ("transição inválida"), não `403` ("papel sem permissão") — a distinção correta é que o estado pedido nunca é alcançável por ninguém através desse endpoint, o que é um problema de fluxo, não de permissão. A remoção foi revertida, com um comentário explicando a decisão para o próximo leitor.
 
 **Testes:** os 4 novos cenários (3 de compatibilidade pós-atribuição + 1 de payload grande) foram adicionados a `business-rules.e2e-spec.ts`, incluindo um controle positivo (a mesma mudança é aceita normalmente quando não há entrega ativa). Total após esta varredura: **85 unitários + 163 de integração = 248 testes**, lint sem avisos, build limpo, e as três correções também verificadas manualmente contra o banco de desenvolvimento real (não só o de teste).
+
+---
+
+## 11. Adendo (24/09/2026): Swagger completo
+
+Bônus implementado: documentação interativa OpenAPI 3 em `/docs` (JSON em `/docs-json`), cobrindo os 41 endpoints.
+
+**Como foi montado, para não virar 41 arquivos de decorators manuais:**
+
+- **Plugin `@nestjs/swagger` do Nest CLI** (`nest-cli.json`, opção `classValidatorShim`): lê os tipos TypeScript e os decorators de `class-validator` de cada DTO em tempo de build e gera o schema sozinho (tipo, obrigatório/opcional, `minLength`/`maxLength`/`minimum`/`maximum` a partir das mesmas regras de validação já escritas). Confirmado inspecionando o `dist/` compilado: o plugin gera um método estático `_OPENAPI_METADATA_FACTORY()` por classe, em vez de decorator por campo.
+- Só os **enums do Prisma** precisaram de `@ApiProperty({ enum: ... })` explícito, porque o Prisma 7 gera pseudo-enums (objeto `as const`), não um `enum` nativo do TypeScript, e o plugin só detecta automaticamente o segundo caso.
+- **DTOs de resposta novos** (um por recurso, ex. `UserResponseDto`, `DeliveryResponseDto`), espelhando exatamente o `select`/`include` que cada service já usa — nenhum campo "inventado".
+- **Duas credenciais no schema de segurança** (`DocumentBuilder.addBearerAuth` + `addApiKey`), com um requisito padrão único (`document.security = [{ ApiKey: [], JWT: [] }]`, um só objeto = as duas exigidas ao mesmo tempo) aplicado a toda operação por padrão; as 3 rotas públicas para JWT (`/health`, `POST /auth/register`, `POST /auth/login`) sobrescrevem isso com `@ApiSecurity('ApiKey')` para exigir só a chave.
+- Um `@ApiErrorResponses(...)` e um `@ApiPaginatedResponse(...)` reutilizáveis, para não repetir a mesma documentação de erro/paginação em cada um dos 41 endpoints.
+
+**Um bug de documentação achado e corrigido durante o trabalho:** a primeira versão colocou `@ApiBearerAuth('JWT')` na classe de 8 dos 10 controllers, pensando em "deixar claro que a rota pede login". Só que, no OpenAPI, um `security` definido na operação **substitui** o padrão do documento inteiro — não soma. Isso fazia a documentação de quase todas as rotas protegidas mostrar só "requer JWT", escondendo que a `X-API-KEY` também é obrigatória (o comportamento real da API nunca mudou, só a documentação estava incompleta). Comprovado gerando o JSON e inspecionando `paths['/orders'].get.security` antes e depois da correção. A correção foi remover esses decorators redundantes de 8 arquivos, deixando a exigência dupla ser herdada do padrão do documento.
+
+**Decisão deliberada:** `/docs` e `/docs-json` ficam acessíveis **sem** `X-API-KEY`, porque `SwaggerModule.setup()` registra suas rotas direto no adapter Express, por fora do pipeline de guards do Nest — não dá para protegê-las com o `ApiKeyGuard` global sem uma configuração à parte, e como essas rotas não expõem nenhum dado (só a própria descrição da API), optamos por não complicar por uma exceção sem risco real. Documentado no README e testado (`swagger.e2e-spec.ts` confirma que ambas respondem 200 sem o cabeçalho).
+
+**Testes:** novo arquivo `swagger.e2e-spec.ts` (5 casos) confirma que `/docs`/`/docs-json` carregam sem chave, que o padrão de segurança do documento é o esperado, que as 3 rotas públicas sobrescrevem corretamente, e que os 41 endpoints aparecem. Estado final: **85 unitários + 168 de integração = 253 testes**, lint sem avisos, build limpo, e a página verificada manualmente (HTML + todos os assets JS/CSS/ícones carregando) e um fluxo completo de login + listagem conferido campo a campo contra o schema documentado.

@@ -2,7 +2,7 @@
 
 API REST backend para gestão de pedidos de entrega, motoristas, veículos e ocorrências, com fluxo de estados, autorização por papel e propriedade dos recursos, upload de comprovante e integração externa de CEP.
 
-**Stack:** NestJS 12 · TypeScript · PostgreSQL · Prisma 7.10.0 (`prisma.config.ts`, driver adapter `pg`, migrations) · JWT · class-validator · Helmet · Compression · Vitest + Supertest.
+**Stack:** NestJS 12 · TypeScript · PostgreSQL · Prisma 7.10.0 (`prisma.config.ts`, driver adapter `pg`, migrations) · JWT · class-validator · Helmet · Compression · Swagger/OpenAPI · Vitest + Supertest.
 
 ## Sumário
 
@@ -60,6 +60,8 @@ A API sobe em `http://localhost:3000` (configurável em `PORT`). **Toda requisi�
 ```bash
 curl -s http://localhost:3000/health -H "X-API-KEY: <valor de API_KEY no seu .env>"
 ```
+
+**Documentação interativa (Swagger):** `http://localhost:3000/docs` — essa página é a única exceção que não exige `X-API-KEY` (é só a descrição da API, sem dado nenhum). Clique em **Authorize** e informe a `X-API-KEY` e, depois de um login em `POST /auth/login`, o token JWT — daí dá para testar qualquer endpoint direto pela página. O JSON puro (OpenAPI 3) fica em `/docs-json`.
 
 > No PowerShell use `Copy-Item .env.example .env` no lugar do `cp`.
 
@@ -322,6 +324,8 @@ Erros de validação (400) trazem `message` como **lista** de problemas.
 **Segurança de entrada:** campos não declarados no DTO são rejeitados com 400 (impede *mass assignment*, por exemplo enviar `"role": "ADMIN"` no cadastro).
 
 ## 11. Endpoints
+
+> A lista abaixo também está disponível de forma interativa (com "Try it out") em `/docs`.
 
 Legenda de acesso: **Público** = sem token · **Autenticado** = qualquer papel · demais = papéis listados.
 Toda rota não pública responde **401** sem token válido, e **403** se o papel não é permitido; esses dois não são repetidos abaixo. **Todas** as rotas, incluindo as públicas, também exigem `X-API-KEY` válida (401 sem ela) — ver [seção 3.1](#31-x-api-key-uma-camada-extra-de-acesso).
@@ -608,7 +612,8 @@ Os testes de integração usam um banco **separado** (`<nome>_test`), criado e m
 - **Estado do veículo "em uso" é derivado**, não armazenado, para não haver duas fontes da verdade.
 - **Regras críticas em duas camadas** (service + banco): índices parciais e `CHECK`s garantem integridade mesmo se houver falha de código ou concorrência.
 - **Migration com SQL manual:** o Prisma não descreve índices parciais no schema, então foram acrescentados à migration inicial (documentados no próprio arquivo).
-- **Bônus implementados:** paginação, filtros, ordenação, seed e testes automatizados. Não implementados: Swagger, Docker e indicadores.
-- **`X-API-KEY` em todas as rotas:** extensão pedida além do enunciado original. Aplicada globalmente, antes do JWT (`ApiKeyGuard`), então nem `/health` funciona sem ela.
+- **Bônus implementados:** paginação, filtros, ordenação, seed, testes automatizados e Swagger. Não implementados: Docker e indicadores.
+- **`X-API-KEY` em todas as rotas:** extensão pedida além do enunciado original. Aplicada globalmente, antes do JWT (`ApiKeyGuard`), então nem `/health` funciona sem ela — **exceto** a própria página do Swagger (`/docs`), que fica fora do pipeline de guards do Nest por como `SwaggerModule.setup()` registra suas rotas (ver seção 15 do material de estudo).
+- **Swagger gerado majoritariamente por inferência:** o plugin `@nestjs/swagger` do Nest CLI (`nest-cli.json`) lê os tipos TypeScript e os decorators do `class-validator` de cada DTO e monta o schema sozinho (`classValidatorShim`), sem precisar anotar campo por campo. Só os enums do Prisma (que não são `enum` nativo do TS) precisaram de `@ApiProperty({ enum: ... })` explícito.
 
 **Limitações conhecidas:** armazenamento de comprovantes em disco local (em produção com várias instâncias, usar armazenamento de objetos); sem limitação de taxa (*rate limiting*); validação de CPF/CNPJ apenas por tamanho, sem dígitos verificadores.

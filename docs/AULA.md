@@ -26,6 +26,7 @@ Material de estudo do projeto **API de Logística e Entregas**. Não é document
 18. [Perguntas de defesa oral](#18-perguntas-de-defesa-oral)
 19. [Exercícios](#19-exercícios)
 20. [Glossário](#20-glossário)
+21. [Adendo: Swagger completo](#21-adendo-24092026-swagger-completo)
 
 ---
 
@@ -804,7 +805,7 @@ Registrado como `APP_GUARD` global em `app.module.ts` — **não** usa `@Public(
 | Tipo | Onde | O que prova | Velocidade |
 |---|---|---|---|
 | **Unitário** | `src/**/*.spec.ts` (85) | lógica pura isolada (transições, conflitos, tipo de arquivo, tratamento de erro do CEP, ambiente) | milissegundos |
-| **Integração / e2e** | `test/*.e2e-spec.ts` (163) | a aplicação inteira, com HTTP e banco reais | segundos |
+| **Integração / e2e** | `test/*.e2e-spec.ts` (168) | a aplicação inteira, com HTTP e banco reais | segundos |
 
 O ideal é muitos unitários (baratos, precisos) e integração para os fluxos e as fronteiras (HTTP, banco, autorização).
 
@@ -869,6 +870,7 @@ Estudar erros reais vale mais do que ler regras.
 | `PATCH /vehicles/:id` e `/drivers/:id` aceitavam tornar uma atribuição **já existente** incompatível (reduzir capacidade abaixo do peso em curso, trocar tipo/categoria para algo que não bate mais) | a regra de compatibilidade só era checada em `POST /deliveries` (na hora de atribuir); editar o cadastro *depois* não revalidava nada | uma regra de negócio vale para **todo** caminho que pode violá-la, não só o caminho "óbvio" pelo qual ela normalmente é violada — reproduzido com `curl` contra o banco de dev antes de corrigir |
 | Corpo JSON acima de 100 KB (limite padrão do Express) virava **500**, não 413 | o `PayloadTooLargeError` do `body-parser` não é uma `HttpException` do Nest, então caía no branch "erro desconhecido" do filtro | um filtro global "pega tudo" (`@Catch()`) só é tão bom quanto os tipos de erro que ele sabe reconhecer; **todo** ponto de entrada não-HTTP-exception (middlewares, libs externas) precisa de um branch dedicado |
 | Quase "corrigi" `DRIVER_TARGET_STATUSES` removendo `ASSIGNED` por parecer código morto | um teste existente quebrou: sem ele, pedir `status: "ASSIGNED"` virava 403 em vez do 409 já testado e intencional | nem toda coisa que parece redundante é um bug; **rode os testes antes de decidir que algo é lixo** — o "código morto" tinha uma razão de ser, documentada no comentário depois |
+| `@ApiBearerAuth('JWT')` na classe de 8 controllers fazia a documentação Swagger dessas rotas mostrar só "exige JWT" | no OpenAPI, o `security` de uma operação **substitui** o padrão do documento, não soma a ele — a API continuava exigindo a X-API-KEY normalmente, só a *documentação* ficou incompleta | gerar o JSON e **inspecionar o campo de verdade** (`paths['/orders'].get.security`) revelou o problema que só ler o código não mostrava; a correção foi confiar no padrão global e parar de repetir a exigência rota a rota |
 
 ---
 
@@ -931,7 +933,7 @@ URL no `prisma.config.ts`; generator `prisma-client` com `output` obrigatório; 
 "Em uso" é derivável de existir uma entrega ativa. Guardar duplicaria a informação e ela poderia divergir.
 
 **19. Como você testou que a API funciona de verdade e não só que compila?**
-248 testes (85 unitários, 163 de integração com banco real), build em clone limpo, execução real com seed e a API real do ViaCEP, e testes das constraints direto no banco. Além disso, uma varredura dedicada de bugs (seção 17) achou e corrigiu 4 defeitos reais que nenhum teste anterior cobria.
+253 testes (85 unitários, 168 de integração com banco real), build em clone limpo, execução real com seed e a API real do ViaCEP, e testes das constraints direto no banco. Além disso, uma varredura dedicada de bugs (seção 17) achou e corrigiu 4 defeitos reais que nenhum teste anterior cobria.
 
 **20. Quais são as limitações do projeto?**
 Uploads em disco local (produção com várias instâncias pede armazenamento de objetos); sem *rate limiting* no login; CPF/CNPJ só validados por tamanho; sem Swagger/Docker.
@@ -941,6 +943,9 @@ São credenciais de níveis diferentes. O JWT identifica o **usuário** logado; 
 
 **22. Numa revisão de bugs, você achou que `PATCH /vehicles/:id` deixava reduzir a capacidade do veículo abaixo do peso de uma entrega já em andamento. Por que isso é um bug, e como você provou antes de corrigir?**
 É um bug porque a regra "veículo não pode receber atribuição incompatível" só era aplicada no momento de **atribuir** (`POST /deliveries`); editar o veículo *depois* de atribuído não revalidava nada, deixando o sistema num estado que a própria regra deveria proibir. Antes de corrigir, escrevi um teste que fazia exatamente esse PATCH e esperava `409` — rodei e confirmei que ele falhava (a API aceitava, `200`), só então implementei a checagem e reexecutei o teste para confirmar que passava. Provar o bug com um teste que falha, antes de corrigir, evita "consertar" algo que na verdade já funcionava.
+
+**23. No Swagger, você definiu que toda rota exige X-API-KEY e Bearer ao mesmo tempo. Como isso é expresso no OpenAPI, e o que quase deu errado?**
+No OpenAPI, um requisito de segurança é uma lista de alternativas (OR); dentro de um mesmo item da lista, cada chave é uma exigência simultânea (AND). Para expressar "as duas ao mesmo tempo", usei um único objeto com as duas chaves — `[{ ApiKey: [], JWT: [] }]` — como padrão do documento inteiro. Quase estraguei isso ao colocar `@ApiBearerAuth('JWT')` em quase todos os controllers: como a segurança de uma *operação* específica substitui (não soma) o padrão do documento, isso fazia a doc dessas rotas mostrar só "exige JWT", escondendo a X-API-KEY. A aplicação continuava correta (o guard real nunca dependeu disso); só a documentação estava errada. Corrigi removendo esses decorators redundantes e deixando as rotas herdarem o padrão global — só as 3 rotas de fato públicas para JWT (`/health`, `/auth/register`, `/auth/login`) têm uma sobrescrita explícita, e só com a X-API-KEY.
 
 ---
 
@@ -956,7 +961,7 @@ Faça sozinho para fixar; as dicas indicam onde mexer. Rode `npm run test:all` a
 
 **Médio**
 
-4. **Endpoint `GET /deliveries/stats`** (staff): total de entregas por status. Dica: `prisma.delivery.groupBy({ by: ['status'], _count: true })`. Atenção à ordem das rotas (`stats` antes de `:id`, senão o `ParseUUIDPipe` devolve 400). Escreva o teste antes.
+4. **Endpoint `GET /deliveries/stats`** (staff): total de entregas por status. Dica: `prisma.delivery.groupBy({ by: ['status'], _count: true })`. Atenção à ordem das rotas (`stats` antes de `:id`, senão o `ParseUUIDPipe` devolve 400). Escreva o teste antes. Depois de criar, documente-o no Swagger (`@ApiTags`, `@ApiOperation`, um `StatsResponseDto` novo) e confira em `/docs` se apareceu certo — e se herdou a segurança padrão (ApiKey+JWT) sem precisar declarar nada.
 5. **Impedir atribuir motorista de CNH "vence em menos de 30 dias".** Dica: nova regra em `findAssignmentConflicts` + testes unitários (é função pura). Decida: bloquear ou só avisar?
 6. **Permitir ao cliente editar `description` de pedido `PENDING`.** Dica: DTO de update com `@IsOptional`, `updateMany` com `status: PENDING` no `WHERE`. E se o pedido já foi agendado? (409.)
 7. **Permitir mais de uma `API_KEY` válida** (uma por integração/cliente, ex.: `API_KEYS="chaveA,chaveB"`). Dica: `ApiKeyGuard` passa a comparar contra uma lista; cuidado para continuar em tempo constante contra **cada** chave, não parar no primeiro `for` que "parece" bater.
@@ -975,6 +980,8 @@ Faça sozinho para fixar; as dicas indicam onde mexer. Rode `npm run test:all` a
 |---|---|
 | **API REST** | interface HTTP em que recursos têm URLs e verbos (GET, POST, PATCH, DELETE) |
 | **API Key** | credencial simples (uma string) que identifica um cliente/integração, não uma pessoa; comparada diretamente, sem login |
+| **OpenAPI** | especificação (formato JSON/YAML) que descreve uma API REST: rotas, parâmetros, formatos de request/response, segurança. "Swagger" é o nome mais usado para o conjunto de ferramentas (UI, geradores) em torno dessa especificação |
+| **Security requirement (OpenAPI)** | lista de alternativas (OR); dentro de um item da lista, várias chaves juntas = exigidas ao mesmo tempo (AND). Um requisito por **operação** substitui o padrão do documento, nunca soma a ele |
 | **DTO** | *Data Transfer Object*: molde do que entra/sai pela API |
 | **DI** | *Dependency Injection*: o framework cria e entrega as dependências das classes |
 | **Guard** | decide se a requisição prossegue (autenticação/autorização) |
@@ -1001,3 +1008,120 @@ Faça sozinho para fixar; as dicas indicam onde mexer. Rode `npm run test:all` a
 | **Mock** | substituto controlado de uma dependência externa, usado em testes |
 | **Teste unitário × integração** | isolado e rápido × várias partes reais juntas |
 | **Gateway Timeout (504) × Bad Gateway (502)** | o servidor de trás demorou demais × respondeu errado ou não respondeu |
+
+---
+
+## 21. Adendo (24/09/2026): Swagger completo
+
+Extensão pedida depois da entrega original ("implemente o swagger completo"). Documentação interativa em `/docs` (JSON em `/docs-json`), cobrindo os 41 endpoints, os 44 schemas de request/response, e as duas credenciais exigidas por rota.
+
+### 21.1 O plugin do Nest CLI: documentação por inferência, não por decorator
+
+A forma manual de usar `@nestjs/swagger` é decorar **cada campo** de **cada DTO** com `@ApiProperty({...})`. Com ~35 DTOs isso seria centenas de decorators repetindo informação que o `class-validator` já tem. Em vez disso, ligamos o **plugin de compilação** do Nest:
+
+```json
+// nest-cli.json
+{
+  "compilerOptions": {
+    "plugins": [{ "name": "@nestjs/swagger", "options": { "classValidatorShim": true, "introspectComments": true } }]
+  }
+}
+```
+
+Ele roda durante o `nest build` (não em runtime) e reescreve cada classe de DTO, acrescentando um método estático:
+
+```ts
+// como o DTO foi escrito
+export class CreateVehicleDto {
+  @Matches(PLATE_PATTERN) plate: string;
+  @IsNumber() @IsPositive() @Max(100000) capacityKg: number;
+}
+
+// o que o plugin gera no dist/ (simplificado)
+export class CreateVehicleDto {
+  plate; capacityKg;
+  static _OPENAPI_METADATA_FACTORY() {
+    return {
+      plate: { required: true, type: () => String },
+      capacityKg: { required: true, type: () => Number, minimum: 0, maximum: 100000 },
+    };
+  }
+}
+```
+
+`SwaggerModule` lê esse método em runtime para montar o schema. `classValidatorShim: true` é o que faz ele também olhar os decorators de validação (`@Max`, `@MinLength`, `@Matches`...) e traduzir para as restrições equivalentes do OpenAPI (`maximum`, `minLength`, `pattern`...). **Resultado prático:** documentei ~35 DTOs sem escrever um `@ApiProperty` sequer neles — só os enums do Prisma precisaram de anotação manual (próxima seção).
+
+Comprovamos isso na prática: inspecionamos o `.js` compilado de um DTO e vimos o método gerado, antes de confiar no mecanismo para os outros 34.
+
+### 21.2 Por que os enums do Prisma precisam de decorator manual
+
+```ts
+export class VehicleResponseDto {
+  @ApiProperty({ enum: VehicleType })   // sem isso, o plugin não sabe que é um enum
+  type: VehicleType;
+}
+```
+
+O Prisma 7 gera seus "enums" como um objeto congelado (`export const VehicleType = { CAR: 'CAR', ... } as const`), não como um `enum` nativo do TypeScript. O plugin do Nest detecta automaticamente `enum` nativo; o padrão do Prisma é só um tipo derivado (`typeof VehicleType[keyof typeof VehicleType]`), que para o compilador é indistinguível de `string`. Por isso, todo campo tipado com um desses pseudo-enums (`Role`, `VehicleType`, `VehicleStatus`, `OrderStatus`, `DeliveryStatus`, `OccurrenceType`, `LicenseCategory`) tem seu `@ApiProperty({ enum: ... })` explícito — sem isso, o Swagger mostraria só `type: string`, sem a lista de valores possíveis.
+
+### 21.3 Duas credenciais, uma regra de segurança
+
+```ts
+const config = new DocumentBuilder()
+  .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
+  .addApiKey({ type: 'apiKey', in: 'header', name: 'X-API-KEY' }, 'ApiKey')
+  .build();
+
+const document = SwaggerModule.createDocument(app, config);
+document.security = [{ ApiKey: [], JWT: [] }];   // padrão: as duas, sempre
+```
+
+No OpenAPI, um requisito de segurança é uma **lista de alternativas** (troque `A` por `B` e o requisito mesmo assim é satisfeito = OR). Dentro de **um único objeto** da lista, cada chave é uma exigência **simultânea** (AND). `[{ ApiKey: [], JWT: [] }]` — um objeto só, duas chaves — significa "as duas, sempre", que é exatamente o comportamento real da API. Se eu tivesse escrito `[{ ApiKey: [] }, { JWT: [] }]` (dois objetos), o significado seria "uma ou outra", errado.
+
+As 3 rotas que só exigem a API key (`/health`, `/auth/register`, `/auth/login`) sobrescrevem esse padrão:
+
+```ts
+@Public()                    // dispensa o JwtAuthGuard de verdade
+@ApiSecurity('ApiKey')       // e documenta que só falta essa credencial
+@Post('login')
+login(@Body() dto: LoginDto) { ... }
+```
+
+### 21.4 O bug que quase passou: security de operação substitui, não soma
+
+Na primeira versão, decorei a **classe** de quase todos os controllers com `@ApiBearerAuth('JWT')`, pensando em deixar explícito "esta rota pede login". Gerei o JSON depois e conferi:
+
+```json
+"paths": { "/orders": { "get": { "security": [{ "JWT": [] }] } } }
+```
+
+Só "JWT" — a X-API-KEY sumiu da documentação dessa rota! O motivo: no OpenAPI, o `security` de uma **operação** específica **substitui inteiramente** o padrão do documento, não soma a ele. Qualquer decorator de segurança em uma rota (`@ApiBearerAuth`, `@ApiSecurity`) cria essa substituição — mesmo que a intenção fosse só "reforçar" que o JWT é necessário. Como eu tinha isso em 8 controllers, praticamente toda a documentação da API estava dizendo "só precisa de JWT", quando na realidade (e nos testes, que continuavam passando) a X-API-KEY sempre foi exigida por um guard separado que nunca mudou.
+
+A correção: remover os decorators redundantes e deixar cada operação **herdar** o padrão do documento. Só as 3 rotas genuinamente diferentes (que dispensam o JWT) têm uma sobrescrita, e ela é mínima: só o que muda.
+
+**A lição, que já apareceu de outra forma na seção 17:** o código real (o guard) nunca mentiu — a superfície que mentia era a documentação, gerada por decorators que eu escrevi por engano. **Ler a saída de verdade** (o JSON gerado) achou um problema que ler o código-fonte, sozinho, não mostrava.
+
+### 21.5 Por que `/docs` não pede X-API-KEY
+
+`SwaggerModule.setup('docs', app, document)` registra as rotas de `/docs` e `/docs-json` **direto no adapter Express**, por fora do sistema de controllers/guards do Nest. Isso significa que o `ApiKeyGuard` — que é um `APP_GUARD` do Nest, e só intercepta rotas que passam pelo pipeline do Nest — nunca chega a rodar para essas duas rotas. Foi uma verificação empírica, não suposição: chamamos `/docs-json` sem nenhum cabeçalho e recebemos `200`.
+
+Decisão consciente: como essas rotas só expõem a **descrição** da API (nenhum dado do domínio), deixamos assim. Um teste (`swagger.e2e-spec.ts`) trava esse comportamento, para não virar surpresa se alguém "corrigir" isso sem querer no futuro.
+
+### 21.6 DTOs de resposta: por que criar classes novas em vez de reusar os de entrada
+
+Os DTOs que já existiam (`CreateOrderDto`, `UpdateVehicleDto`...) descrevem o que **entra**. O que os services **devolvem** é moldado pelo `select`/`include` do Prisma, que não é uma classe TypeScript — é um objeto de configuração. Para o Swagger documentar a resposta, criamos uma classe por formato de saída (`OrderResponseDto`, `DeliveryResponseDto`...), copiando fielmente os mesmos campos que o `select`/`include` real devolve. Não é duplicação por acaso: é a mesma razão de sempre para ter um DTO — a resposta da API é um contrato, e um contrato precisa de um nome e um formato próprios, mesmo que hoje coincida com a saída do Prisma.
+
+Um caso interessional: `DeliveriesService.toView()` devolve um formato **diferente** para `CUSTOMER` (motorista e veículo reduzidos, sem `assignedBy`) do que para o resto. O OpenAPI não tem um jeito elegante de dizer "a forma da resposta depende de quem pergunta" sem complicar demais o schema; a solução pragmática foi documentar o formato completo (staff) e explicar a redução na **descrição** da operação (`@ApiOperation({ description: '...' })`) — sinceridade sobre uma limitação da ferramenta, em vez de fingir que não existe.
+
+### 21.7 Reaproveitando documentação repetida
+
+Sem cuidado, cada um dos 41 endpoints repetiria a mesma documentação de erro (`400`, `401`, `403`...) e cada endpoint paginado repetiria a mesma forma `{ data, meta }`. Dois decorators compostos (`applyDecorators`, um recurso do Nest para "empacotar" vários decorators em um só) resolvem isso:
+
+```ts
+@ApiErrorResponses(400, 401, 403, 404, 409)   // em vez de 5 @ApiResponse repetidos
+@ApiPaginatedResponse(VehicleResponseDto)      // em vez de escrever o schema { data, meta } à mão
+@Get()
+findAll(@Query() query: ListVehiclesDto) { ... }
+```
+
+**A lição:** o Swagger "completo" não significa "verboso" — as mesmas ideias de reaproveitamento que valem para o código de negócio (funções puras, decorators de erro no filtro global) valem para a documentação também.
