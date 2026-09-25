@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -10,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -120,5 +123,20 @@ export class DriversController {
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateDriverDto) {
     return this.drivers.update(id, dto);
+  }
+
+  @Roles(Role.OPERATOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Exclui um motorista (e o usuário dele)',
+    description:
+      'Só é possível se o motorista nunca teve nenhuma entrega (409 caso contrário; use active: false).',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiNoContentResponse({ description: 'Excluído' })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @HttpCode(204)
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.drivers.remove(id);
   }
 }

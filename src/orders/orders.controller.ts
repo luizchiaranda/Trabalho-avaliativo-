@@ -72,7 +72,8 @@ export class OrdersController {
 
   @ApiOperation({
     summary: 'Tentativas de entrega deste pedido',
-    description: 'Um pedido pode ter mais de uma (se uma falhar e for reatribuído).',
+    description:
+      'Um pedido pode ter mais de uma (se uma falhar e for reatribuído).',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiPaginatedResponse(DeliveryResponseDto)
@@ -88,7 +89,8 @@ export class OrdersController {
 
   @ApiOperation({
     summary: 'Cancela um pedido',
-    description: 'Só é possível enquanto o pedido está PENDING (409 caso contrário).',
+    description:
+      'Só é possível enquanto o pedido está PENDING (409 caso contrário).',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: OrderResponseDto })

@@ -1,13 +1,16 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
   Query,
 } from '@nestjs/common';
 import {
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -83,5 +86,20 @@ export class CustomersController {
     @Query() query: ListOrdersDto,
   ) {
     return this.customers.findOrders(user, id, query);
+  }
+
+  @Roles(Role.OPERATOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Exclui um cliente (e o usuário dele)',
+    description:
+      'Só é possível se o cliente nunca fez nenhum pedido (409 caso contrário; desative o usuário com PATCH /users/:id).',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiNoContentResponse({ description: 'Excluído' })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @HttpCode(204)
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.customers.remove(id);
   }
 }

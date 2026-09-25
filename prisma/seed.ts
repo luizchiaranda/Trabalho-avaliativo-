@@ -19,8 +19,15 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
-async function upsertUser(name: string, email: string, role: Role) {
-  const passwordHash = await bcrypt.hash(password, 10);
+// Senha própria só em dev: em produção todos usam SEED_PASSWORD.
+async function upsertUser(
+  name: string,
+  email: string,
+  role: Role,
+  ownPassword?: string,
+) {
+  const plain = isProduction ? password : (ownPassword ?? password);
+  const passwordHash = await bcrypt.hash(plain, 10);
   return prisma.user.upsert({
     where: { email },
     update: {},
@@ -81,6 +88,29 @@ async function main() {
     },
   });
 
+  await upsertUser(
+    'Ana Gestora',
+    'ana.gestora@logistica.local',
+    Role.ADMIN,
+    'Gestora@2026',
+  );
+
+  const brunoUser = await upsertUser(
+    'Bruno Cliente',
+    'bruno.cliente@logistica.local',
+    Role.CUSTOMER,
+    'Cliente@2026',
+  );
+  await prisma.customer.upsert({
+    where: { userId: brunoUser.id },
+    update: {},
+    create: {
+      userId: brunoUser.id,
+      document: '52998224725',
+      phone: '11988880002',
+    },
+  });
+
   const vehicles = [
     {
       plate: 'ABC1D23',
@@ -119,6 +149,11 @@ async function main() {
     '  DRIVER    motorista@logistica.local (CNH B)  |  moto@logistica.local (CNH A)',
   );
   console.log('  CUSTOMER  cliente@logistica.local');
+  if (!isProduction) {
+    console.log('Usuários com senha própria:');
+    console.log('  ADMIN     ana.gestora@logistica.local    Gestora@2026');
+    console.log('  CUSTOMER  bruno.cliente@logistica.local  Cliente@2026');
+  }
 }
 
 main()

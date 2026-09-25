@@ -48,11 +48,11 @@ describe('Documentação Swagger (/docs)', () => {
       });
   });
 
-  it('documenta os 41 endpoints da API', async () => {
+  it('documenta os 44 endpoints da API', async () => {
     const response = await request(ctx.server).get('/docs-json');
     const total = Object.values(
       response.body.paths as Record<string, Record<string, unknown>>,
     ).reduce((sum, methods) => sum + Object.keys(methods).length, 0);
-    expect(total).toBe(41);
+    expect(total).toBe(44);
   });
 });

@@ -23,7 +23,7 @@ Fale, sem tela de código ainda, ou com o README aberto:
 Mostre rapidamente a estrutura de pastas (`src/`) e diga:
 
 > "São 8 módulos de domínio — auth, users, customers, drivers, vehicles, orders, deliveries,
-> occurrences —, cada um com controller, service e DTOs próprios. No total, 41 endpoints, 253
+> occurrences —, cada um com controller, service e DTOs próprios. No total, 44 endpoints, 265
 > testes automatizados e documentação OpenAPI completa em `/docs`."
 
 ## 1:30 – 4:00 | Modelagem e regras de negócio (2min30)
@@ -117,7 +117,7 @@ Test Files  9 passed (9)
      Tests  168 passed (168)   <- integração (e2e, banco real de teste)
 ```
 
-> "253 testes no total. Na semana passada fiz uma varredura de bugs deliberada: escrevi um
+> "265 testes no total. Na semana passada fiz uma varredura de bugs deliberada: escrevi um
 > teste que reproduzia o comportamento suspeito antes de mexer em qualquer código — encontrei
 > e corrigi 3 bugs reais assim, documentados na seção 10 do relatório."
 
@@ -142,7 +142,7 @@ seção "Perguntas de defesa oral"):
 ## 14:30 – 15:00 | Encerramento (30s)
 
 > "Resumindo: API completa, com autenticação em duas camadas, máquina de estados de entrega
-> garantida até no banco, upload de comprovante validado pelo conteúdo real, 253 testes
+> garantida até no banco, upload de comprovante validado pelo conteúdo real, 265 testes
 > automatizados e documentação interativa completa. Fico à disposição para perguntas."
 
 ---

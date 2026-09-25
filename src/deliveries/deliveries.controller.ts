@@ -80,7 +80,8 @@ export class DeliveriesController {
 
   @ApiOperation({
     summary: 'Histórico de mudanças de status da entrega',
-    description: 'Ordem cronológica; nunca é alterado depois de criado (append-only).',
+    description:
+      'Ordem cronológica; nunca é alterado depois de criado (append-only).',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: DeliveryHistoryEntryDto, isArray: true })
@@ -145,7 +146,8 @@ export class DeliveriesController {
 
   @ApiOperation({
     summary: 'Baixa o comprovante de entrega',
-    description: 'Devolve o arquivo em stream, com o Content-Type real detectado no upload.',
+    description:
+      'Devolve o arquivo em stream, com o Content-Type real detectado no upload.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiProduces('image/jpeg', 'image/png', 'application/pdf')

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { pageArgs, paginated } from '../common/dto/pagination-query.dto.js';
 import type { AuthUser } from '../common/types/auth-user.js';
+import { deleteUserAccount } from '../common/utils/delete-user-account.js';
 import { hashPassword } from '../common/utils/password.js';
 import { publicUserSelect } from '../common/utils/selects.js';
 import { DeliveriesService } from '../deliveries/deliveries.service.js';
@@ -143,6 +144,15 @@ export class DriversService {
       },
       include: driverInclude,
     });
+  }
+
+  async remove(id: string) {
+    const driver = await this.findOne(id);
+    await deleteUserAccount(
+      this.prisma,
+      driver.userId,
+      'desative o motorista (PATCH /drivers/:id com active: false)',
+    );
   }
 
   async findDeliveries(user: AuthUser, id: string, query: ListDeliveriesDto) {

@@ -45,7 +45,9 @@ export class OccurrencesController {
     return this.occurrences.create(user, deliveryId, dto);
   }
 
-  @ApiOperation({ summary: 'Lista as ocorrências de uma entrega, em ordem cronológica' })
+  @ApiOperation({
+    summary: 'Lista as ocorrências de uma entrega, em ordem cronológica',
+  })
   @ApiParam({ name: 'deliveryId', format: 'uuid' })
   @ApiOkResponse({ type: OccurrenceResponseDto, isArray: true })
   @ApiErrorResponses(400, 401, 404)

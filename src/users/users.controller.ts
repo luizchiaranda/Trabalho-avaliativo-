@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -10,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -76,5 +79,24 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
   ) {
     return this.users.update(actor, id, dto);
+  }
+
+  @ApiOperation({
+    summary: 'Exclui um usuário (e o perfil de cliente/motorista ligado a ele)',
+    description:
+      'Só é possível se a conta não tem histórico de pedidos, entregas, mudanças de status ' +
+      'ou ocorrências (409 caso contrário; use PATCH com active: false). ' +
+      'Um administrador não pode excluir a própria conta (409).',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiNoContentResponse({ description: 'Excluído' })
+  @ApiErrorResponses(400, 401, 403, 404, 409)
+  @HttpCode(204)
+  @Delete(':id')
+  remove(
+    @CurrentUser() actor: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.users.remove(actor, id);
   }
 }

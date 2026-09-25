@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { paginated, pageArgs } from '../common/dto/pagination-query.dto.js';
 import type { AuthUser } from '../common/types/auth-user.js';
+import { deleteUserAccount } from '../common/utils/delete-user-account.js';
 import { hashPassword } from '../common/utils/password.js';
 import { publicUserSelect } from '../common/utils/selects.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -65,5 +66,17 @@ export class UsersService {
       data: dto,
       select: publicUserSelect,
     });
+  }
+
+  async remove(actor: AuthUser, id: string) {
+    await this.findOne(id);
+    if (actor.id === id) {
+      throw new ConflictException('Você não pode excluir a própria conta');
+    }
+    await deleteUserAccount(
+      this.prisma,
+      id,
+      'desative o usuário (PATCH /users/:id com active: false)',
+    );
   }
 }

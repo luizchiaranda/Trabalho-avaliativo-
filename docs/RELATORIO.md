@@ -7,7 +7,7 @@ Data de conclusão: 21/09/2026 · Adendo (`X-API-KEY`): 22/09/2026
 
 ## 1. Resumo
 
-Foi entregue uma API REST completa para logística e entregas, com **41 endpoints**, 4 perfis de acesso, fluxo de estados com histórico, atribuição com regras de compatibilidade, upload de comprovante e integração externa de CEP.
+Foi entregue uma API REST completa para logística e entregas, com **44 endpoints**, 4 perfis de acesso, fluxo de estados com histórico, atribuição com regras de compatibilidade, upload de comprovante e integração externa de CEP.
 
 | Indicador | Resultado |
 |---|---|
@@ -104,7 +104,7 @@ Foi entregue uma API REST completa para logística e entregas, com **41 endpoint
 
 ## 4. Testes
 
-### 4.1 Testes de integração (168) — banco PostgreSQL real, banco de teste separado
+### 4.1 Testes de integração (180) — banco PostgreSQL real, banco de teste separado
 
 | Arquivo | Testes | Foco |
 |---|:-:|---|
@@ -116,7 +116,8 @@ Foi entregue uma API REST completa para logística e entregas, com **41 endpoint
 | `upload.e2e-spec.ts` | 15 | Upload válido e inválido, path traversal, download |
 | `cep-integration.e2e-spec.ts` | 10 | Integração funcionando e falhando de forma controlada |
 | `security.e2e-spec.ts` | 11 | Helmet, Compression, Interceptor, dados sensíveis, formato de erro |
-| `swagger.e2e-spec.ts` | 5 | `/docs` e `/docs-json` acessíveis sem X-API-KEY; segurança padrão (ApiKey+JWT) vs. rotas públicas (só ApiKey); os 41 endpoints documentados |
+| `swagger.e2e-spec.ts` | 5 | `/docs` e `/docs-json` acessíveis sem X-API-KEY; segurança padrão (ApiKey+JWT) vs. rotas públicas (só ApiKey); os 44 endpoints documentados |
+| `deletes.e2e-spec.ts` | 12 | Exclusão de usuário, motorista e cliente: sucesso (204, perfil apagado junto, token deixa de valer), 409 com histórico e na própria conta, 404, 400, 403 |
 
 ### 4.2 Testes unitários (85)
 
@@ -202,7 +203,7 @@ npx prisma migrate deploy
 npm run seed
 npm run build
 npm test                      # 85 unitários
-npm run test:e2e              # 168 de integração (cria o banco <nome>_test sozinho)
+npm run test:e2e              # 180 de integração (cria o banco <nome>_test sozinho)
 npm run start:prod
 # documentação interativa em http://localhost:3000/docs
 ```
@@ -253,7 +254,7 @@ Os bugs 1–3 são do mesmo tipo: a regra "motorista/veículo não podem ter atr
 
 ## 11. Adendo (24/09/2026): Swagger completo
 
-Bônus implementado: documentação interativa OpenAPI 3 em `/docs` (JSON em `/docs-json`), cobrindo os 41 endpoints.
+Bônus implementado: documentação interativa OpenAPI 3 em `/docs` (JSON em `/docs-json`), cobrindo os 44 endpoints.
 
 **Como foi montado, para não virar 41 arquivos de decorators manuais:**
 
@@ -261,10 +262,32 @@ Bônus implementado: documentação interativa OpenAPI 3 em `/docs` (JSON em `/d
 - Só os **enums do Prisma** precisaram de `@ApiProperty({ enum: ... })` explícito, porque o Prisma 7 gera pseudo-enums (objeto `as const`), não um `enum` nativo do TypeScript, e o plugin só detecta automaticamente o segundo caso.
 - **DTOs de resposta novos** (um por recurso, ex. `UserResponseDto`, `DeliveryResponseDto`), espelhando exatamente o `select`/`include` que cada service já usa — nenhum campo "inventado".
 - **Duas credenciais no schema de segurança** (`DocumentBuilder.addBearerAuth` + `addApiKey`), com um requisito padrão único (`document.security = [{ ApiKey: [], JWT: [] }]`, um só objeto = as duas exigidas ao mesmo tempo) aplicado a toda operação por padrão; as 3 rotas públicas para JWT (`/health`, `POST /auth/register`, `POST /auth/login`) sobrescrevem isso com `@ApiSecurity('ApiKey')` para exigir só a chave.
-- Um `@ApiErrorResponses(...)` e um `@ApiPaginatedResponse(...)` reutilizáveis, para não repetir a mesma documentação de erro/paginação em cada um dos 41 endpoints.
+- Um `@ApiErrorResponses(...)` e um `@ApiPaginatedResponse(...)` reutilizáveis, para não repetir a mesma documentação de erro/paginação em cada um dos 44 endpoints.
 
 **Um bug de documentação achado e corrigido durante o trabalho:** a primeira versão colocou `@ApiBearerAuth('JWT')` na classe de 8 dos 10 controllers, pensando em "deixar claro que a rota pede login". Só que, no OpenAPI, um `security` definido na operação **substitui** o padrão do documento inteiro — não soma. Isso fazia a documentação de quase todas as rotas protegidas mostrar só "requer JWT", escondendo que a `X-API-KEY` também é obrigatória (o comportamento real da API nunca mudou, só a documentação estava incompleta). Comprovado gerando o JSON e inspecionando `paths['/orders'].get.security` antes e depois da correção. A correção foi remover esses decorators redundantes de 8 arquivos, deixando a exigência dupla ser herdada do padrão do documento.
 
 **Decisão deliberada:** `/docs` e `/docs-json` ficam acessíveis **sem** `X-API-KEY`, porque `SwaggerModule.setup()` registra suas rotas direto no adapter Express, por fora do pipeline de guards do Nest — não dá para protegê-las com o `ApiKeyGuard` global sem uma configuração à parte, e como essas rotas não expõem nenhum dado (só a própria descrição da API), optamos por não complicar por uma exceção sem risco real. Documentado no README e testado (`swagger.e2e-spec.ts` confirma que ambas respondem 200 sem o cabeçalho).
 
-**Testes:** novo arquivo `swagger.e2e-spec.ts` (5 casos) confirma que `/docs`/`/docs-json` carregam sem chave, que o padrão de segurança do documento é o esperado, que as 3 rotas públicas sobrescrevem corretamente, e que os 41 endpoints aparecem. Estado final: **85 unitários + 168 de integração = 253 testes**, lint sem avisos, build limpo, e a página verificada manualmente (HTML + todos os assets JS/CSS/ícones carregando) e um fluxo completo de login + listagem conferido campo a campo contra o schema documentado.
+**Testes:** novo arquivo `swagger.e2e-spec.ts` (5 casos) confirma que `/docs`/`/docs-json` carregam sem chave, que o padrão de segurança do documento é o esperado, que as 3 rotas públicas sobrescrevem corretamente, e que os 44 endpoints aparecem. Estado final: **85 unitários + 168 de integração = 253 testes**, lint sem avisos, build limpo, e a página verificada manualmente (HTML + todos os assets JS/CSS/ícones carregando) e um fluxo completo de login + listagem conferido campo a campo contra o schema documentado.
+
+## 12. Adendo (25/09/2026): exclusão de usuários, motoristas e clientes
+
+Pedido depois da entrega: permitir excluir usuários "e o que for preciso". Novas rotas:
+
+| Método | URL | Acesso | Resposta |
+|---|---|---|---|
+| DELETE | `/users/:id` | ADMIN | `204` · `404` · `409` a própria conta ou conta com histórico |
+| DELETE | `/drivers/:id` | OPERATOR, ADMIN | `204` · `404` · `409` motorista com entregas |
+| DELETE | `/customers/:id` | OPERATOR, ADMIN | `204` · `404` · `409` cliente com pedidos |
+
+**Regra (a mesma já usada em `DELETE /vehicles/:id`):** exclusão física só para quem não tem histórico, ou seja, nenhum pedido, entrega, mudança de status ou ocorrência ligada à conta. Com histórico a resposta é **409**, com a orientação de desativar (`active: false`). Apagar essas linhas quebraria a trilha de auditoria de entregas já feitas.
+
+**Implementação:** uma única função, `deleteUserAccount` (`src/common/utils/delete-user-account.ts`), usada pelos três services. Ela confere o histórico e depois apaga perfil (Customer/Driver) e User numa transação. A checagem existe para dar uma mensagem clara. A garantia final continua sendo das FKs `onDelete: Restrict`: se uma entrega for criada entre a checagem e o delete, o banco recusa (P2003), e o `AllExceptionsFilter` já traduz isso para 409. Não é preciso nenhum código novo para invalidar a sessão, porque o `JwtAuthGuard` relê o usuário no banco a cada requisição, e o token de uma conta excluída passa a responder 401.
+
+**Testes:** novo `deletes.e2e-spec.ts` (12 casos). Também foi verificado contra a API real do banco de dev: exclusão (204), autoexclusão (409) e cliente do seed com pedidos (409).
+
+**Checkup final:**
+- 85 unitários + 180 de integração = **265 testes** passando.
+- Lint sem avisos, build limpo, schema sem divergência com o banco.
+- Prettier aplicado em 5 controllers que tinham ficado fora do padrão no commit do Swagger (só formatação).
+- Um `500` visto em `POST /auth/register` durante testes manuais no Swagger foi investigado. Cadastro duplicado por e-mail, por documento, por ambos, por e-mail com maiúsculas e com 4 requisições simultâneas respondeu sempre `201` e depois `409`, e os limites dos DTOs cobrem todas as colunas. Não foi possível reproduzir o erro, e o log daquela execução não guardou a pilha.

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { pageArgs, paginated } from '../common/dto/pagination-query.dto.js';
 import type { AuthUser } from '../common/types/auth-user.js';
+import { deleteUserAccount } from '../common/utils/delete-user-account.js';
 import { publicUserSelect } from '../common/utils/selects.js';
 import { Prisma } from '../generated/prisma/client.js';
 import type { ListOrdersDto } from '../orders/dto/list-orders.dto.js';
@@ -61,6 +62,15 @@ export class CustomersService {
     });
     if (!customer) throw new NotFoundException('Cliente não encontrado');
     return customer;
+  }
+
+  async remove(id: string) {
+    const customer = await this.findOne(id);
+    await deleteUserAccount(
+      this.prisma,
+      customer.userId,
+      'desative o usuário do cliente (PATCH /users/:id com active: false)',
+    );
   }
 
   async findOrders(user: AuthUser, id: string, query: ListOrdersDto) {

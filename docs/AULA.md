@@ -1013,7 +1013,7 @@ Faça sozinho para fixar; as dicas indicam onde mexer. Rode `npm run test:all` a
 
 ## 21. Adendo (24/09/2026): Swagger completo
 
-Extensão pedida depois da entrega original ("implemente o swagger completo"). Documentação interativa em `/docs` (JSON em `/docs-json`), cobrindo os 41 endpoints, os 44 schemas de request/response, e as duas credenciais exigidas por rota.
+Extensão pedida depois da entrega original ("implemente o swagger completo"). Documentação interativa em `/docs` (JSON em `/docs-json`), cobrindo os 44 endpoints, os 44 schemas de request/response, e as duas credenciais exigidas por rota.
 
 ### 21.1 O plugin do Nest CLI: documentação por inferência, não por decorator
 
@@ -1115,7 +1115,7 @@ Um caso interessional: `DeliveriesService.toView()` devolve um formato **diferen
 
 ### 21.7 Reaproveitando documentação repetida
 
-Sem cuidado, cada um dos 41 endpoints repetiria a mesma documentação de erro (`400`, `401`, `403`...) e cada endpoint paginado repetiria a mesma forma `{ data, meta }`. Dois decorators compostos (`applyDecorators`, um recurso do Nest para "empacotar" vários decorators em um só) resolvem isso:
+Sem cuidado, cada um dos 44 endpoints repetiria a mesma documentação de erro (`400`, `401`, `403`...) e cada endpoint paginado repetiria a mesma forma `{ data, meta }`. Dois decorators compostos (`applyDecorators`, um recurso do Nest para "empacotar" vários decorators em um só) resolvem isso:
 
 ```ts
 @ApiErrorResponses(400, 401, 403, 404, 409)   // em vez de 5 @ApiResponse repetidos

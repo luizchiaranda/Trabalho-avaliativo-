@@ -99,7 +99,8 @@ export class VehiclesController {
 
   @ApiOperation({
     summary: 'Exclui um veículo',
-    description: 'Só é possível se o veículo nunca teve nenhuma entrega (409 caso contrário; use status: INACTIVE).',
+    description:
+      'Só é possível se o veículo nunca teve nenhuma entrega (409 caso contrário; use status: INACTIVE).',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiNoContentResponse({ description: 'Excluído' })

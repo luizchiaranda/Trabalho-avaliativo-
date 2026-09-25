@@ -284,7 +284,7 @@ Referências inexistentes (pedido, motorista, veículo) retornam **404**. A veri
 
 **Estado:** transição fora do fluxo = **409**. `DELIVERED` sem comprovante = **409**. `FAILED` sem ocorrência registrada = **409**. Alteração concorrente detectada por *update condicional* (`WHERE status = <estado lido>`) = **409**.
 
-**Cadastros:** e-mail, documento, CNH e placa duplicados = **409**. Veículo com histórico de entregas não pode ser excluído (**409**; use `status: INACTIVE`). Motorista/veículo em entrega ativa não podem ser inativados. Um administrador não pode desativar a própria conta.
+**Cadastros:** e-mail, documento, CNH e placa duplicados = **409**. Veículo com histórico de entregas não pode ser excluído (**409**; use `status: INACTIVE`); o mesmo vale para usuário, cliente e motorista com qualquer histórico de pedidos, entregas, mudanças de status ou ocorrências (**409**; desative com `active: false`), para não quebrar a trilha de auditoria. Excluir um usuário apaga junto o perfil de cliente/motorista, e o token dele passa a responder **401**. Motorista/veículo em entrega ativa não podem ser inativados. Um administrador não pode desativar nem excluir a própria conta.
 
 ## 10. Convenções da API
 
@@ -354,6 +354,7 @@ Regras: `password` 8–72 caracteres com letras e números; `document` CPF (11) 
 | GET | `/users` | ADMIN | `?role&active&page&limit&order` | `200` lista paginada |
 | GET | `/users/:id` | ADMIN | — | `200` · `400` UUID inválido · `404` |
 | PATCH | `/users/:id` | ADMIN | `{name?, active?}` | `200` · `404` · `409` desativar a própria conta |
+| DELETE | `/users/:id` | ADMIN | — | `204` (apaga também o perfil de cliente/motorista) · `404` · `409` a própria conta ou conta com histórico |
 
 ### Clientes
 
@@ -364,6 +365,7 @@ Regras: `password` 8–72 caracteres com letras e números; `document` CPF (11) 
 | GET | `/customers` | OPERATOR, ADMIN | `?page&limit&order` | `200` lista paginada |
 | GET | `/customers/:id` | OPERATOR, ADMIN | — | `200` · `404` |
 | GET | `/customers/:id/orders` | OPERATOR, ADMIN | `?status&page&limit&order` | `200` pedidos do cliente · `404` |
+| DELETE | `/customers/:id` | OPERATOR, ADMIN | — | `204` (apaga o usuário junto) · `404` · `409` cliente com pedidos |
 
 ### Motoristas
 
@@ -376,6 +378,7 @@ Regras: `password` 8–72 caracteres com letras e números; `document` CPF (11) 
 | GET | `/drivers/:id` | OPERATOR, ADMIN | — | `200` · `404` |
 | PATCH | `/drivers/:id` | OPERATOR, ADMIN | `{phone?, licenseCategory?, licenseExpiresAt?, active?}` | `200` · `404` · `409` desativar motorista com entrega ativa |
 | GET | `/drivers/:id/deliveries` | OPERATOR, ADMIN | `?status&page&limit&order` | `200` · `404` |
+| DELETE | `/drivers/:id` | OPERATOR, ADMIN | — | `204` (apaga o usuário junto) · `404` · `409` motorista com entregas |
 
 ### Veículos
 
@@ -584,7 +587,7 @@ Para usar uma API mock, basta apontar `CEP_API_BASE_URL` para ela (deve responde
 
 ```bash
 npm test          # 85 testes unitários
-npm run test:e2e  # 163 testes de integração
+npm run test:e2e  # 180 testes de integração
 ```
 
 Os testes de integração usam um banco **separado** (`<nome>_test`), criado e migrado automaticamente; seus dados de desenvolvimento não são tocados. A API de CEP é substituída por um servidor HTTP local (mock) para simular sucesso, CEP inexistente, lentidão, erro 500, resposta inválida e provedor fora do ar.
@@ -598,7 +601,7 @@ Os testes de integração usam um banco **separado** (`<nome>_test`), criado e m
 | `X-API-KEY` ausente/errada → 401 em toda rota | `api-key.e2e-spec.ts` |
 | Sem permissão → 403 | `authorization.e2e-spec.ts` (matriz de papéis) |
 | Recurso inexistente → 404 | `business-rules.e2e-spec.ts` |
-| Conflito de regra → 409 | `business-rules.e2e-spec.ts` (inclui condição de corrida) |
+| Conflito de regra → 409 | `business-rules.e2e-spec.ts` (inclui condição de corrida), `deletes.e2e-spec.ts` (exclusão com histórico) |
 | Acesso a recurso de terceiro | `authorization.e2e-spec.ts` |
 | Upload válido e inválido | `upload.e2e-spec.ts`, `file-signature.spec.ts` |
 | Integração externa funcionando e falhando | `cep-integration.e2e-spec.ts`, `cep.service.spec.ts` |
